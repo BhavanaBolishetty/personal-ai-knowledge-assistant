@@ -1,0 +1,57 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+
+# --- Environment variables ---
+# Matches .env at any depth (repo root and frontend/), never .env.example.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- Docker / Postgres ---
+# Postgres data lives in a named Docker volume (see docker-compose.yml),
+# not a bind-mounted folder here — nothing to ignore for it directly.
+# pgdata/ is kept in case a local override ever bind-mounts one.
+pgdata/
+*.log
+
+# --- Local database files (defensive; this project uses Postgres only) ---
+*.sqlite3
+*.db
+
+# --- Uploaded files (local dev storage) ---
+backend/storage/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDE / editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Temporary files ---
+*.tmp
+*.temp
+*.bak

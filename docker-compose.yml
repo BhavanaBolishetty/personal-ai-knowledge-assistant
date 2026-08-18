@@ -1,0 +1,44 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: paika-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: paika-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Inside the Docker network the database is reachable by service name,
+      # not "localhost" — this overrides whatever POSTGRES_HOST is set to in .env.
+      POSTGRES_HOST: db
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/storage:/app/storage
+      # Caches the downloaded embedding model so it's fetched from
+      # Hugging Face once, not on every container restart.
+      - hf_cache:/root/.cache/huggingface
+
+volumes:
+  pgdata:
+  hf_cache:
