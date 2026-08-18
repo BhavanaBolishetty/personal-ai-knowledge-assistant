@@ -20,4 +20,10 @@ EXPOSE 8000
 # is the single schema-management mechanism in every environment (a fresh
 # `docker compose up` on an empty database works with no manual step) —
 # not just for local host-side development.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+#
+# $PORT is honored (falling back to 8000) because Render assigns the
+# listening port dynamically. --reload is dropped when ENVIRONMENT=production
+# (unnecessary overhead / file-watching in a container that never changes
+# after build) but kept by default so local `docker compose up` still
+# live-reloads from the bind-mounted ./backend/app volume, unchanged.
+CMD ["sh", "-c", "alembic upgrade head && if [ \"$ENVIRONMENT\" = production ]; then exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}; else exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload; fi"]

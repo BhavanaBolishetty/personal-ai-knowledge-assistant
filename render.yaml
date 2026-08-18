@@ -1,0 +1,48 @@
+# Render Blueprint — creates both services in one step via "New +" ->
+# "Blueprint" in the Render dashboard, pointed at this repo.
+# Secrets (sync: false) are NOT stored here; Render prompts for them once
+# in its dashboard and keeps them out of git.
+services:
+  - type: web
+    name: paika-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false # set to the frontend's live URL, e.g. https://paika-frontend.onrender.com
+      - key: DATABASE_URL
+        sync: false # Neon connection string
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: STORAGE_BACKEND
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+
+  - type: web
+    name: paika-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false # set to the backend's live URL, e.g. https://paika-backend.onrender.com
+    routes:
+      # Client-side routing fallback (this app is a single-page app).
+      - type: rewrite
+        source: /*
+        destination: /index.html

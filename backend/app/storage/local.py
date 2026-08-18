@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from app.core.config import settings
-
 
 class LocalFileStorage:
     def __init__(self, base_dir: Path):
@@ -37,5 +35,10 @@ class LocalFileStorage:
     def exists(self, relative_path: str) -> bool:
         return self._resolve(relative_path).is_file()
 
-
-storage = LocalFileStorage(Path(settings.storage_dir))
+    def serving_url(
+        self, relative_path: str, *, filename: str, content_type: str, disposition: str
+    ) -> str | None:
+        # None tells the caller to stream the file itself via path() +
+        # FileResponse instead — there's no separate public URL for a file
+        # sitting on local disk.
+        return None

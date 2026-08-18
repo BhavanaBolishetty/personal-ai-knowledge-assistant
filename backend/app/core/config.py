@@ -6,14 +6,50 @@ load_dotenv()
 
 
 class Settings:
+    # "development" (default) keeps local Docker/host behavior unchanged
+    # (e.g. uvicorn --reload). Set to "production" in Render.
+    environment = os.getenv("ENVIRONMENT", "development")
+
     postgres_user = os.getenv("POSTGRES_USER", "paika_user")
     postgres_password = os.getenv("POSTGRES_PASSWORD", "paika_password")
     postgres_db = os.getenv("POSTGRES_DB", "paika_knowledge_base")
     postgres_host = os.getenv("POSTGRES_HOST", "localhost")
     postgres_port = os.getenv("POSTGRES_PORT", "5432")
+    # Managed Postgres providers (e.g. Neon) hand out one connection string
+    # instead of separate user/password/host/db parts. When set, this takes
+    # priority over the POSTGRES_* parts above; local dev leaves it unset
+    # and keeps building the URL from those parts as before.
+    database_url_override = os.getenv("DATABASE_URL", "")
+
+    # Comma-separated list of origins allowed to call this API with
+    # credentials. Defaults to the local Vite dev server so `docker compose
+    # up` / running the backend on the host keeps working with no .env
+    # change. Production sets this to the deployed frontend's real origin.
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+        if origin.strip()
+    ]
 
     storage_dir = os.getenv("STORAGE_DIR", "storage/uploads")
     max_upload_size_bytes = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(10 * 1024 * 1024)))
+
+    # "local" (default) keeps using disk storage under storage_dir, exactly
+    # as before — no behavior change for local dev/Docker. "r2" switches to
+    # Cloudflare R2 (S3-compatible) so uploads survive Render's ephemeral
+    # filesystem in production. See app/storage/r2.py.
+    storage_backend = os.getenv("STORAGE_BACKEND", "local")
+    r2_account_id = os.getenv("R2_ACCOUNT_ID", "")
+    r2_access_key_id = os.getenv("R2_ACCESS_KEY_ID", "")
+    r2_secret_access_key = os.getenv("R2_SECRET_ACCESS_KEY", "")
+    r2_bucket_name = os.getenv("R2_BUCKET_NAME", "")
+    # Usually derived from the account id; only set this to override
+    # (e.g. a custom S3-compatible endpoint).
+    r2_endpoint_url = os.getenv("R2_ENDPOINT_URL", "") or (
+        f"https://{os.getenv('R2_ACCOUNT_ID', '')}.r2.cloudflarestorage.com"
+        if os.getenv("R2_ACCOUNT_ID")
+        else ""
+    )
 
     # URL ingestion (SSRF-conscious). Small, conservative defaults: a
     # personal knowledge base fetching articles/blog posts, not a general
@@ -119,6 +155,22 @@ class Settings:
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            # Neon (and most managed Postgres) connection strings use the
+            # plain "postgresql://" scheme; SQLAlchemy needs the psycopg2
+            # driver named explicitly.
+            url = self.database_url_override
+            if url.startswith("postgresql://"):
+                url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            elif url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+            # Neon requires TLS; add it if the connection string didn't
+            # already specify sslmode (e.g. a local override wouldn't).
+            if "sslmode=" not in url:
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}sslmode=require"
+            return url
+
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

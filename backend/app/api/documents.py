@@ -2,7 +2,7 @@ import uuid
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
@@ -133,6 +133,19 @@ def get_document_file(document_id: uuid.UUID, db: Session = Depends(get_db)):
     else:
         content_type = "application/octet-stream"
         disposition = "attachment"
+
+    # LocalFileStorage returns None here (nothing to redirect to — stream
+    # from disk instead). R2Storage returns a short-lived presigned URL, so
+    # the browser downloads/views the file directly from R2 instead of
+    # proxying the bytes through this API.
+    redirect_url = storage.serving_url(
+        document.storage_path,
+        filename=document.original_filename,
+        content_type=content_type,
+        disposition=disposition,
+    )
+    if redirect_url is not None:
+        return RedirectResponse(redirect_url, status_code=302)
 
     return FileResponse(
         path=storage.path(document.storage_path),
