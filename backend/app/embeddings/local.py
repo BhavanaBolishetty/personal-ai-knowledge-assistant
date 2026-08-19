@@ -53,15 +53,15 @@ class LocalEmbeddingProvider:
 
         # Verified programmatically from the model's real output, not
         # assumed — the whole point of this check is to catch a mismatch
-        # between EMBEDDING_DIMENSION and the actual model before any
+        # between LOCAL_EMBEDDING_DIMENSION and the actual model before any
         # vector gets stored in the fixed-width pgvector column.
         probe = model.encode(["dimension probe"], convert_to_numpy=True)
         actual_dimension = int(probe.shape[-1])
         if actual_dimension != self.expected_dimension:
             raise EmbeddingError(
                 f"Embedding model '{self.model_name}' produces {actual_dimension}-dimensional "
-                f"vectors, but EMBEDDING_DIMENSION is set to {self.expected_dimension}. "
-                "Update EMBEDDING_DIMENSION (and recreate the chunks.embedding column) to match."
+                f"vectors, but LOCAL_EMBEDDING_DIMENSION is set to {self.expected_dimension}. "
+                "Update LOCAL_EMBEDDING_DIMENSION (and recreate the chunks.embedding column) to match."
             )
 
         self._model = model

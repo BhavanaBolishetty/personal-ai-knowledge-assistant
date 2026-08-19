@@ -4,6 +4,41 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+_LOCAL_EMBEDDING_MODEL_DEFAULT = "all-MiniLM-L6-v2"
+_LOCAL_EMBEDDING_DIMENSION_DEFAULT = 384
+# 768 is Google's smallest officially recommended output_dimensionality for
+# gemini-embedding-001 (it supports 128-3072 via Matryoshka Representation
+# Learning, truncated + renormalized server-side) — a meaningful quality
+# upgrade over all-MiniLM-L6-v2's 384 dimensions, while keeping pgvector
+# storage/comparison cost reasonable. Verified against Gemini API docs.
+_GEMINI_EMBEDDING_MODEL_DEFAULT = "gemini-embedding-001"
+_GEMINI_EMBEDDING_DIMENSION_DEFAULT = 768
+
+
+def _resolve_embedding_config(provider: str) -> tuple[str, int]:
+    """Returns (model_name, dimension) for the given embedding provider.
+
+    Deliberately uses provider-scoped env var names (LOCAL_EMBEDDING_* /
+    GEMINI_EMBEDDING_*) rather than one shared EMBEDDING_MODEL_NAME /
+    EMBEDDING_DIMENSION pair. A shared name is a trap: a value set for one
+    provider (e.g. in a .env file that predates EMBEDDING_PROVIDER
+    existing at all) silently applies to the other provider too, since
+    os.getenv(key, default) only uses `default` when the key is fully
+    absent — not when it "belongs" to the wrong provider. That's exactly
+    how a production backfill run ended up sending
+    model="all-MiniLM-L6-v2" to the Gemini API and failed with "400
+    INVALID_ARGUMENT: unexpected model name format". Provider-scoped
+    names make that class of bug structurally impossible: there is no
+    longer any env var name both providers could accidentally share.
+    """
+    if provider == "gemini":
+        model_name = os.getenv("GEMINI_EMBEDDING_MODEL_NAME", _GEMINI_EMBEDDING_MODEL_DEFAULT)
+        dimension = int(os.getenv("GEMINI_EMBEDDING_DIMENSION", str(_GEMINI_EMBEDDING_DIMENSION_DEFAULT)))
+    else:
+        model_name = os.getenv("LOCAL_EMBEDDING_MODEL_NAME", _LOCAL_EMBEDDING_MODEL_DEFAULT)
+        dimension = int(os.getenv("LOCAL_EMBEDDING_DIMENSION", str(_LOCAL_EMBEDDING_DIMENSION_DEFAULT)))
+    return model_name, dimension
+
 
 class Settings:
     # "development" (default) keeps local Docker/host behavior unchanged
@@ -82,28 +117,14 @@ class Settings:
     # answer generation — no separate credential needed.
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local")
 
-    # Defaults depend on which provider is selected, since "local" and
-    # "gemini" use entirely different models with different native output
-    # sizes — both are still fully overridable via env vars.
-    _default_embedding_model = (
-        "gemini-embedding-001" if embedding_provider == "gemini" else "all-MiniLM-L6-v2"
-    )
-    # 768 is Google's smallest officially recommended output_dimensionality
-    # for gemini-embedding-001 (it supports 128-3072 via Matryoshka
-    # Representation Learning, truncated + renormalized server-side) — a
-    # meaningful quality upgrade over all-MiniLM-L6-v2's 384 dimensions,
-    # while keeping pgvector storage/comparison cost reasonable for a
-    # personal knowledge base. Verified against Gemini API docs, not
-    # guessed (see EMBEDDING_PROVIDER change notes).
-    _default_embedding_dimension = "768" if embedding_provider == "gemini" else "384"
-
-    # This is used to size the "chunks.embedding" pgvector column, so it
-    # must match whatever the active provider actually returns — both
-    # LocalEmbeddingProvider and GeminiEmbeddingProvider verify this
-    # against the real output at call time and raise loudly on a mismatch,
-    # rather than silently storing the wrong width.
-    embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", _default_embedding_model)
-    embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", _default_embedding_dimension))
+    # See _resolve_embedding_config's docstring above for why this isn't
+    # two plain os.getenv(...) calls on a shared env var name. This is
+    # used to size the "chunks.embedding" pgvector column, so it must
+    # match whatever the active provider actually returns — both
+    # LocalEmbeddingProvider and GeminiEmbeddingProvider additionally
+    # verify this against the real output at call time and raise loudly
+    # on a mismatch, rather than silently storing the wrong width.
+    embedding_model_name, embedding_dimension = _resolve_embedding_config(embedding_provider)
 
     # sentence-transformers encodes a batch of texts in one vectorized
     # forward pass, which is far faster than one call per chunk. 32 is a

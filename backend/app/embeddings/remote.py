@@ -89,8 +89,8 @@ class GeminiEmbeddingProvider:
             if len(vector) != self.dimension:
                 raise EmbeddingError(
                     f"Gemini embedding model '{self.model_name}' returned a "
-                    f"{len(vector)}-dimensional vector, but EMBEDDING_DIMENSION is "
-                    f"set to {self.dimension}. Update EMBEDDING_DIMENSION (and recreate "
+                    f"{len(vector)}-dimensional vector, but GEMINI_EMBEDDING_DIMENSION is "
+                    f"set to {self.dimension}. Update GEMINI_EMBEDDING_DIMENSION (and recreate "
                     "the chunks.embedding column) to match."
                 )
 

@@ -1,7 +1,9 @@
 """Re-embeds every chunk whose embedding is NULL, using whichever
-embedding provider is currently configured (EMBEDDING_PROVIDER,
-EMBEDDING_MODEL_NAME, EMBEDDING_DIMENSION — the same settings the app
-itself reads, see app/core/config.py).
+embedding provider is currently configured (EMBEDDING_PROVIDER, plus
+either LOCAL_EMBEDDING_MODEL_NAME/LOCAL_EMBEDDING_DIMENSION or
+GEMINI_EMBEDDING_MODEL_NAME/GEMINI_EMBEDDING_DIMENSION depending on
+which provider is active — the same settings the app itself reads, see
+app/core/config.py).
 
 Needed after 560002ce2db7_widen_chunks_embedding_for_configurable_.py:
 that migration drops and recreates chunks.embedding whenever the
