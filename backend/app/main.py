@@ -1,12 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import ask, conversations, documents, health, search
 from app.core.config import settings
+from app.core.memory_diagnostics import log_memory
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Baseline for comparison against the jump logged when the embedding
+    # model first loads (app/embeddings/local.py) — the embedding model is
+    # NOT loaded yet at this point (it's lazy, on first use), so this
+    # number is FastAPI/uvicorn/SQLAlchemy/etc. only.
+    log_memory("startup")
+    yield
+
 
 # Schema is managed by Alembic migrations (backend/alembic/), not
 # create_all — run `alembic upgrade head` after pulling schema changes.
-app = FastAPI(title="Personal AI Knowledge Assistant", version="0.1.0")
+app = FastAPI(title="Personal AI Knowledge Assistant", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

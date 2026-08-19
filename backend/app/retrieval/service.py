@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.memory_diagnostics import log_memory
 from app.embeddings import embed_texts
 from app.retrieval.repository import search_chunks
 from app.retrieval.validation import validate_query
@@ -40,4 +41,6 @@ def search(db: Session, query: str, top_k: int) -> list[dict]:
         for row in rows
     ]
 
-    return [r for r in results if r["similarity_score"] >= settings.min_relevance_score]
+    filtered = [r for r in results if r["similarity_score"] >= settings.min_relevance_score]
+    log_memory("after_retrieval")
+    return filtered

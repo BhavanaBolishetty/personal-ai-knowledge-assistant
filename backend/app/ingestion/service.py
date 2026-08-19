@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.chunking import chunk_text
 from app.core.config import settings
+from app.core.memory_diagnostics import log_memory
 from app.db import crud
 from app.db.models import Document, SourceType
 from app.embeddings import embed_texts
@@ -120,4 +121,6 @@ def _process_document(
         db.rollback()
         return crud.mark_document_failed(db, document, error_message=f"Embedding failed: {exc}")
 
-    return crud.mark_document_completed(db, document, extracted_text=extracted_text)
+    completed = crud.mark_document_completed(db, document, extracted_text=extracted_text)
+    log_memory("after_document_ingestion")
+    return completed

@@ -19,8 +19,28 @@ class LocalEmbeddingProvider:
         if self._model is not None:
             return self._model
 
+        import os
+
+        from app.core.memory_diagnostics import log_memory
+
+        # Must be set before torch is imported (below, transitively via
+        # sentence_transformers) — it reads these once at init. Without
+        # this, torch's CPU backend spins up one OpenMP/MKL thread per
+        # core, each with its own allocator arena; on a small
+        # memory-limited container that's pure overhead for an app that
+        # only ever handles one embedding request at a time (single
+        # uvicorn worker, no concurrent model calls).
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+        log_memory("before_embedding_model_load")
+
         try:
             from sentence_transformers import SentenceTransformer
+            import torch
+
+            torch.set_num_threads(1)
         except ImportError as exc:
             raise EmbeddingError("sentence-transformers is not installed.") from exc
 
@@ -45,6 +65,7 @@ class LocalEmbeddingProvider:
             )
 
         self._model = model
+        log_memory("after_embedding_model_load")
         return self._model
 
     def embed(self, texts: list[str]) -> list[list[float]]:

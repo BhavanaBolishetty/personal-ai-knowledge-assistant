@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.memory_diagnostics import log_memory
 from app.db import crud
 from app.db.models import MessageRole
 from app.llm import generate_answer
@@ -37,6 +38,7 @@ def answer_question(db: Session, query: str, top_k: int) -> dict:
     prompt = build_prompt(question=query, context=context)
     answer_text = generate_answer(system_instruction=SYSTEM_INSTRUCTION, prompt=prompt)
     answer_text, cited_sources = select_cited_sources(answer_text, sources)
+    log_memory("after_answer_generation")
 
     return _result(answer_text, cited_sources, results, settings.gemini_model)
 
@@ -90,6 +92,7 @@ def answer_conversation_question(db: Session, conversation_id: uuid.UUID, query:
         # history back) instead of just letting the user retry.
         answer_text = generate_answer(system_instruction=SYSTEM_INSTRUCTION, prompt=prompt)
         answer_text, cited_sources = select_cited_sources(answer_text, sources)
+        log_memory("after_answer_generation")
         result = _result(answer_text, cited_sources, results, settings.gemini_model)
 
     crud.create_message(db, conversation_id, role=MessageRole.user, content=query)
