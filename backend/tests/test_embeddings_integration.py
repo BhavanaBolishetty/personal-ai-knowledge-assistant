@@ -43,7 +43,7 @@ def test_no_silently_missing_embeddings_across_multiple_chunks():
 def test_embedding_failure_is_handled_cleanly_and_document_not_marked_completed(monkeypatch):
     import app.ingestion.service as service_module
 
-    def _broken_embed_texts(texts):
+    def _broken_embed_texts(texts, **kwargs):
         raise RuntimeError("simulated embedding failure")
 
     monkeypatch.setattr(service_module, "embed_texts", _broken_embed_texts)

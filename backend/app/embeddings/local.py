@@ -68,7 +68,11 @@ class LocalEmbeddingProvider:
         log_memory("after_embedding_model_load")
         return self._model
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], *, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
+        # sentence-transformers has no concept of task-specific embeddings
+        # (that's a Gemini-specific feature — see GeminiEmbeddingProvider);
+        # task_type is accepted only so callers don't need to know which
+        # provider is active.
         if not texts:
             return []
 

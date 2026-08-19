@@ -2,13 +2,13 @@ from typing import Protocol
 
 
 class EmbeddingProvider(Protocol):
-    """Minimal interface the rest of the app depends on. LocalEmbeddingProvider
-    is the only implementation for now. A remote/paid API provider could be
-    added later (e.g. app/embeddings/remote.py) behind this same interface
-    without changing any caller — only app/embeddings/service.py would need
-    to point at it.
+    """Minimal interface the rest of the app depends on.
+    LocalEmbeddingProvider (sentence-transformers, local dev default) and
+    GeminiEmbeddingProvider (app/embeddings/remote.py, production default)
+    both implement this — only app/embeddings/service.py knows which one
+    is active.
     """
 
     dimension: int
 
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def embed(self, texts: list[str], *, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]: ...

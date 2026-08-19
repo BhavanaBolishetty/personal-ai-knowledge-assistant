@@ -1,0 +1,6 @@
+# Only needed for EMBEDDING_PROVIDER=local (LocalEmbeddingProvider,
+# sentence-transformers). Not installed in the production Docker image
+# (see Dockerfile's INSTALL_LOCAL_EMBEDDINGS build arg) when
+# EMBEDDING_PROVIDER=gemini means this is never imported at runtime — see
+# app/embeddings/service.py and the memory investigation notes in README.
+sentence-transformers>=3.0

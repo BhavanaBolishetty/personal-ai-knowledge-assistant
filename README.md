@@ -147,6 +147,37 @@ docker compose down
 This stops the containers but keeps the database's data in a Docker volume.
 Add `-v` if you want to wipe the database completely.
 
+## Embeddings: local vs. production
+
+`EMBEDDING_PROVIDER` (see `.env.example`) picks how document/query text is
+turned into vectors:
+
+- **`local`** (default — used everywhere above): a free, local
+  sentence-transformers model (`all-MiniLM-L6-v2`, 384 dimensions). No API
+  key, no network call, but loading it pulls in torch, which adds
+  ~370MB of resident memory — fine for local dev, too much for a small
+  free-tier hosting plan.
+- **`gemini`**: Gemini's remote embedding API (`gemini-embedding-001`, 768
+  dimensions by default), used in production. No local model/torch at all —
+  every embed is a network call to Gemini instead, using the same
+  `GEMINI_API_KEY` already configured for answer generation.
+
+Switching `EMBEDDING_PROVIDER` changes the vector space, not just its
+width — an embedding from one provider is not comparable to one from the
+other. `alembic upgrade head` handles the schema side automatically (the
+`chunks.embedding` column is resized to match, clearing old embeddings at
+the old width rather than leaving invalid data behind). Any existing
+chunks then need re-embedding with the new provider:
+
+```
+cd backend
+python -m scripts.backfill_embeddings          # re-embeds everything with a NULL embedding
+python -m scripts.backfill_embeddings --dry-run # preview first, no writes
+```
+
+It's safe to re-run if interrupted — it always picks up chunks that still
+need an embedding, so nothing is processed (or billed) twice.
+
 ## Running the backend without Docker (optional)
 
 Useful if you want to debug the backend directly rather than rebuilding the

@@ -58,9 +58,9 @@ def test_query_embedding_uses_the_shared_embedding_function(monkeypatch):
     calls = []
     original_embed_texts = service_module.embed_texts
 
-    def _spy_embed_texts(texts):
+    def _spy_embed_texts(texts, **kwargs):
         calls.append(list(texts))
-        return original_embed_texts(texts)
+        return original_embed_texts(texts, **kwargs)
 
     monkeypatch.setattr(service_module, "embed_texts", _spy_embed_texts)
 
@@ -145,7 +145,7 @@ def test_embedding_model_failure_returns_clean_error(monkeypatch):
     import app.retrieval.service as service_module
     from app.embeddings import EmbeddingError
 
-    def _broken_embed_texts(texts):
+    def _broken_embed_texts(texts, **kwargs):
         raise EmbeddingError("simulated embedding backend failure")
 
     monkeypatch.setattr(service_module, "embed_texts", _broken_embed_texts)

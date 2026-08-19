@@ -112,7 +112,7 @@ def _process_document(
         return crud.mark_document_failed(db, document, error_message=f"Chunking failed: {exc}")
 
     try:
-        embeddings = embed_texts([text for text, _ in chunk_records])
+        embeddings = embed_texts([text for text, _ in chunk_records], task_type="RETRIEVAL_DOCUMENT")
         crud.store_chunk_embeddings(db, chunks, embeddings)
     except Exception as exc:
         # The chunk rows are already committed and deliberately left in

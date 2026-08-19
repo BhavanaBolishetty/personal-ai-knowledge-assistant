@@ -18,7 +18,7 @@ def search(db: Session, query: str, top_k: int) -> list[dict]:
     Retrieval only — no answer is generated here.
     """
     query = validate_query(query)
-    query_embedding = embed_texts([query])[0]
+    query_embedding = embed_texts([query], task_type="RETRIEVAL_QUERY")[0]
     rows = search_chunks(db, query_embedding, top_k)
 
     results = [

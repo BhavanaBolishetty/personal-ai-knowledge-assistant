@@ -70,21 +70,40 @@ class Settings:
     chunk_size_chars = int(os.getenv("CHUNK_SIZE_CHARS", "1000"))
     chunk_overlap_chars = int(os.getenv("CHUNK_OVERLAP_CHARS", "150"))
 
-    # Embeddings (Milestone 4). "all-MiniLM-L6-v2" is a small (~80MB), free,
-    # CPU-friendly sentence-transformers model: no paid API key, no GPU
-    # needed, and fast enough to embed a document's chunks in well under a
-    # second on a laptop CPU. Trade-off: lower retrieval quality than a
-    # larger model (e.g. all-mpnet-base-v2) or a paid API embedding — an
-    # acceptable starting point, swappable later behind EmbeddingProvider.
-    #
-    # EMBEDDING_DIMENSION=384 was confirmed by loading the model and
-    # checking the actual shape of its output (not guessed). It is used to
-    # size the "chunks.embedding" pgvector column, so it must be updated
-    # (and that column re-created) if the model ever changes.
-    # LocalEmbeddingProvider re-checks this at load time and raises loudly
-    # if the model's real output size doesn't match.
-    embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
-    embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", "384"))
+    # Embeddings. "local" (default) uses sentence-transformers'
+    # "all-MiniLM-L6-v2" — small (~80MB), free, CPU-friendly, no API key —
+    # a good fit for local dev, but loading torch + the model itself adds
+    # ~370MB of resident memory, which doesn't fit Render's free-tier
+    # 512MB backend (confirmed by direct measurement — see memory
+    # investigation notes). "gemini" switches to Gemini's remote embedding
+    # API (app/embeddings/remote.py): no local model, no torch, at the
+    # cost of a network call per embed and Gemini API quota usage instead
+    # of unlimited local compute. Same GEMINI_API_KEY already used for
+    # answer generation — no separate credential needed.
+    embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local")
+
+    # Defaults depend on which provider is selected, since "local" and
+    # "gemini" use entirely different models with different native output
+    # sizes — both are still fully overridable via env vars.
+    _default_embedding_model = (
+        "gemini-embedding-001" if embedding_provider == "gemini" else "all-MiniLM-L6-v2"
+    )
+    # 768 is Google's smallest officially recommended output_dimensionality
+    # for gemini-embedding-001 (it supports 128-3072 via Matryoshka
+    # Representation Learning, truncated + renormalized server-side) — a
+    # meaningful quality upgrade over all-MiniLM-L6-v2's 384 dimensions,
+    # while keeping pgvector storage/comparison cost reasonable for a
+    # personal knowledge base. Verified against Gemini API docs, not
+    # guessed (see EMBEDDING_PROVIDER change notes).
+    _default_embedding_dimension = "768" if embedding_provider == "gemini" else "384"
+
+    # This is used to size the "chunks.embedding" pgvector column, so it
+    # must match whatever the active provider actually returns — both
+    # LocalEmbeddingProvider and GeminiEmbeddingProvider verify this
+    # against the real output at call time and raise loudly on a mismatch,
+    # rather than silently storing the wrong width.
+    embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", _default_embedding_model)
+    embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", _default_embedding_dimension))
 
     # sentence-transformers encodes a batch of texts in one vectorized
     # forward pass, which is far faster than one call per chunk. 32 is a

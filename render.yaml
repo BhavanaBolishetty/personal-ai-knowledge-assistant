@@ -31,6 +31,18 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         sync: false
+      # Gemini's remote embedding API instead of the local
+      # sentence-transformers/torch model — the local model's ~370MB
+      # resident memory doesn't fit the free plan's 512MB limit (confirmed
+      # by direct measurement). Uses the same GEMINI_API_KEY above.
+      - key: EMBEDDING_PROVIDER
+        value: gemini
+      # Render exposes every service env var as a Docker build arg of the
+      # same name (see Dockerfile) — this skips installing
+      # sentence-transformers/torch in the image entirely, since
+      # EMBEDDING_PROVIDER=gemini never imports them at runtime.
+      - key: INSTALL_LOCAL_EMBEDDINGS
+        value: "false"
 
   - type: web
     name: paika-frontend

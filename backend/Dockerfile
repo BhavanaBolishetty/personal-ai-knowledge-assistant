@@ -2,13 +2,29 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Render automatically exposes every env var configured on a service as a
+# Docker build arg of the same name, so setting INSTALL_LOCAL_EMBEDDINGS=false
+# as a normal env var on the Render backend service (see render.yaml) is all
+# that's needed to skip this in production — no separate build-arg config.
+# Defaults to "true" so local `docker compose up --build` (which doesn't set
+# this) keeps installing sentence-transformers/torch unchanged, since local
+# dev defaults to EMBEDDING_PROVIDER=local and needs them.
+ARG INSTALL_LOCAL_EMBEDDINGS=true
+
+COPY requirements-core.txt .
+COPY requirements-local-embeddings.txt .
 # torch (a sentence-transformers dependency) defaults to a multi-GB
 # CUDA-enabled build on Linux. This container has no GPU, so install the
 # CPU-only build explicitly first — pip then sees torch is already
-# satisfied and skips it when installing the rest of requirements.txt.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements.txt
+# satisfied and skips it when installing requirements-local-embeddings.txt.
+# Skipped entirely in production (EMBEDDING_PROVIDER=gemini — see
+# app/embeddings/service.py — never imports sentence-transformers/torch at
+# runtime, so there's no reason to spend build time/image size on them).
+RUN if [ "$INSTALL_LOCAL_EMBEDDINGS" = "true" ]; then \
+      pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+      pip install --no-cache-dir -r requirements-local-embeddings.txt; \
+    fi
+RUN pip install --no-cache-dir -r requirements-core.txt
 
 COPY app ./app
 COPY alembic.ini .
