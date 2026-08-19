@@ -164,15 +164,17 @@ class Settings:
     # margin on both sides.
     min_relevance_score = float(os.getenv("MIN_RELEVANCE_SCORE", "0.3"))
 
-    # Answer generation (Milestone 6). "gemini-2.5-flash" is Google's
-    # lightweight, fast Gemini model — confirmed free-tier eligible, with a
-    # generous free daily request quota, which matters since this is a
-    # personal project. Same reasoning as picking a small local embedding
-    # model in Milestone 4: appropriate for this project's scale, not a
-    # guess. Configurable so a newer/different model can be swapped in via
-    # .env without any code change.
+    # Answer generation (Milestone 6). "gemini-2.5-flash" was the original
+    # pick here — Google's lightweight, fast, free-tier-eligible model at
+    # the time — but Google retired it for accounts created after some
+    # date ("no longer available to new users", confirmed via a live 404
+    # from the API itself, not assumed). "gemini-3.6-flash" is the exact
+    # replacement Gemini's own error message named, and confirmed stable
+    # (not preview) in the current model list. Configurable so a
+    # newer/different model can be swapped in via .env without any code
+    # change — this is exactly that kind of swap.
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
     # Bounds how much retrieved text is sent to Gemini per question. Gemini's
     # own context window is far larger than this, so the limit isn't about

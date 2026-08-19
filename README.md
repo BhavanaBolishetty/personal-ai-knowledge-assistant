@@ -470,11 +470,10 @@ to do with what's in your knowledge base. Retrieving first and handing
 Gemini only the relevant chunks is what makes an answer "grounded" instead
 of "made up but convincing."
 
-**Model: `gemini-2.5-flash`.** Confirmed free-tier eligible (Google made it
-free-tier as of April 2026) with a generous daily free request quota —
-appropriate for a personal project, the same reasoning as picking a small
-local model for embeddings. Configurable via `GEMINI_MODEL` in `.env`, so a
-newer or different model can be swapped in without touching any code.
+**Model: `gemini-3.6-flash`.** (Originally `gemini-2.5-flash`, which Google
+later retired for new accounts — swapped after a live 404 confirmed it,
+see `GEMINI_MODEL` in `.env`.) Configurable via `GEMINI_MODEL`, so a newer
+or different model can be swapped in again without touching any code.
 
 **How answers stay grounded (not just "asked nicely"):** the system prompt
 (`app/synthesis/prompt.py`) explicitly instructs Gemini to use *only* the
