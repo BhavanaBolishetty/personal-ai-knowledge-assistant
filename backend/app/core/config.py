@@ -153,16 +153,35 @@ class Settings:
     # actually relevant — on a small, mixed-topic knowledge base, an
     # off-topic chunk can still rank in the top few purely from sharing
     # generic wording with the query. min_relevance_score filters those
-    # out before they ever reach the context sent to Gemini. Calibrated
-    # empirically against this project's embedding model
-    # (all-MiniLM-L6-v2), not guessed: querying a real mixed-topic
-    # knowledge base (e.g. "Where is load balancing used?" against
-    # binary-search and load-balancing documents), genuinely on-topic
-    # matches — including loosely-phrased, paraphrased queries — scored
-    # 0.45-0.85, while off-topic documents scored 0.05-0.30 even when they
-    # shared generic wording with the query. 0.3 sits in that gap with
-    # margin on both sides.
-    min_relevance_score = float(os.getenv("MIN_RELEVANCE_SCORE", "0.3"))
+    # out before they ever reach the context sent to Gemini.
+    #
+    # Deliberately provider-scoped (LOCAL_MIN_RELEVANCE_SCORE /
+    # GEMINI_MIN_RELEVANCE_SCORE), not a single shared MIN_RELEVANCE_SCORE
+    # — the same lesson as embedding_model_name/embedding_dimension above.
+    # Different embedding models produce differently-shaped similarity
+    # score distributions, so a threshold tuned for one is not valid for
+    # the other, and a shared name would silently misapply whichever
+    # value happened to be set to the wrong provider.
+    #
+    # LOCAL default (0.3): calibrated empirically against
+    # all-MiniLM-L6-v2 — querying a real mixed-topic knowledge base
+    # (binary-search and load-balancing documents), genuinely on-topic
+    # matches scored 0.45-0.85, off-topic scored 0.05-0.30. 0.3 sits in
+    # that gap with margin on both sides.
+    #
+    # GEMINI default (0.55): calibrated empirically against
+    # gemini-embedding-001 in production — querying real production
+    # documents with several genuinely off-topic questions (different
+    # domains, no lexical overlap), off-topic scored 0.41-0.47 even
+    # though nothing matched, while a genuinely on-topic query scored
+    # 0.72-0.76. Gemini's embedding space evidently has a higher baseline
+    # similarity floor than MiniLM's — reusing 0.3 here would let clearly
+    # irrelevant chunks through. 0.55 sits in the observed gap with
+    # margin on both sides, same methodology as the LOCAL calibration.
+    if embedding_provider == "gemini":
+        min_relevance_score = float(os.getenv("GEMINI_MIN_RELEVANCE_SCORE", "0.55"))
+    else:
+        min_relevance_score = float(os.getenv("LOCAL_MIN_RELEVANCE_SCORE", "0.3"))
 
     # Answer generation (Milestone 6). "gemini-2.5-flash" was the original
     # pick here — Google's lightweight, fast, free-tier-eligible model at

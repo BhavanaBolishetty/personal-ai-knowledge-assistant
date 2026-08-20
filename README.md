@@ -509,14 +509,19 @@ different situations, handled two different ways:
   calling Gemini at all. There's nothing to ground an answer in, so there's
   no reason to spend a free-tier request finding that out.
 - **Some chunks were retrieved, but none clear the relevance bar** —
-  retrieval filters out anything below `MIN_RELEVANCE_SCORE` (default
-  `0.3`, cosine similarity) before it ever reaches Gemini. This was
-  calibrated empirically, not guessed: querying a real mixed-topic
-  knowledge base, genuinely on-topic matches (even loosely-phrased,
-  paraphrased queries) scored 0.45-0.85, while off-topic documents scored
-  0.05-0.30 even when they shared generic wording with the query — see
-  `app/core/config.py`. If everything retrieved still gets filtered out,
-  this collapses into the same "nothing retrieved" case above. The
+  retrieval filters out anything below a minimum cosine-similarity score
+  before it ever reaches Gemini. This threshold is provider-scoped and
+  calibrated empirically, not guessed, for each embedding model
+  separately (different models produce differently-shaped score
+  distributions — see `app/core/config.py`): `LOCAL_MIN_RELEVANCE_SCORE`
+  (default `0.3`) for the local MiniLM model, where genuinely on-topic
+  matches scored 0.45-0.85 and off-topic scored 0.05-0.30;
+  `GEMINI_MIN_RELEVANCE_SCORE` (default `0.55`) for Gemini's embedding
+  model in production, which has a measurably higher baseline similarity
+  floor — off-topic queries against real production documents scored
+  0.41-0.47 even with zero topical overlap, while genuinely on-topic
+  queries scored 0.72-0.76. If everything retrieved still gets filtered
+  out, this collapses into the same "nothing retrieved" case above. The
   grounding instruction is a second, independent layer on top: even if a
   borderline chunk clears the threshold, Gemini is still told directly to
   say the context is insufficient rather than answer anyway.

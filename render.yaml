@@ -37,6 +37,13 @@ services:
       # by direct measurement). Uses the same GEMINI_API_KEY above.
       - key: EMBEDDING_PROVIDER
         value: gemini
+      # Calibrated empirically against real production queries — Gemini's
+      # embedding space has a measurably higher baseline similarity floor
+      # than the local MiniLM model, so reusing the local threshold let
+      # clearly off-topic content pass the relevance filter (see the
+      # comment in app/core/config.py).
+      - key: GEMINI_MIN_RELEVANCE_SCORE
+        value: "0.55"
       # Render exposes every service env var as a Docker build arg of the
       # same name (see Dockerfile) — this skips installing
       # sentence-transformers/torch in the image entirely, since
