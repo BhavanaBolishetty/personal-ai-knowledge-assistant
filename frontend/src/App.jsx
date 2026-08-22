@@ -140,7 +140,9 @@ function MainApp() {
         </button>
         <h1>Personal AI Knowledge Assistant</h1>
         <div className="app-header-user">
-          <span className="app-header-email">{currentUser.email}</span>
+          <span className="app-header-email" title={currentUser.email}>
+            {currentUser.email}
+          </span>
           <button
             type="button"
             className="icon-button"

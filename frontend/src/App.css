@@ -71,10 +71,11 @@
   font-size: 0.8rem;
   color: var(--text);
   opacity: 0.75;
-  max-width: 180px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: default;
 }
 
 .app-loading {

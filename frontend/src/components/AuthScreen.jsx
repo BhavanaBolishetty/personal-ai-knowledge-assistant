@@ -27,17 +27,43 @@ function AuthScreen() {
     }
   }
 
-  function toggleMode() {
-    setMode((current) => (current === "login" ? "signup" : "login"));
+  function switchMode(nextMode) {
+    if (nextMode === mode) return;
+    setMode(nextMode);
     setError("");
+    setPassword("");
   }
 
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <h1 className="auth-title">Personal AI Knowledge Assistant</h1>
+
+        <div className="auth-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "login"}
+            className={`auth-tab${mode === "login" ? " auth-tab-active" : ""}`}
+            onClick={() => switchMode("login")}
+          >
+            Log In
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "signup"}
+            className={`auth-tab${mode === "signup" ? " auth-tab-active" : ""}`}
+            onClick={() => switchMode("signup")}
+          >
+            Sign Up
+          </button>
+        </div>
+
         <p className="auth-subtitle">
-          {mode === "login" ? "Log in to see your documents and conversations." : "Create an account to get started."}
+          {mode === "login"
+            ? "Log in to see your documents and conversations."
+            : "Create an account — your documents and conversations will be private to you."}
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -51,6 +77,12 @@ function AuthScreen() {
               autoComplete="email"
               autoFocus
             />
+            {mode === "signup" && (
+              <p className="field-hint">
+                No confirmation email is sent — double-check this is typed correctly, since it's how you'll log
+                back in.
+              </p>
+            )}
           </label>
 
           <label className="auth-field">
@@ -69,13 +101,9 @@ function AuthScreen() {
           {error && <p className="status status-error">{error}</p>}
 
           <button type="submit" className="auth-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Please wait…" : mode === "login" ? "Log in" : "Sign up"}
+            {isSubmitting ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
           </button>
         </form>
-
-        <button type="button" className="auth-toggle" onClick={toggleMode}>
-          {mode === "login" ? "Need an account? Sign up" : "Already have an account? Log in"}
-        </button>
       </div>
     </div>
   );
