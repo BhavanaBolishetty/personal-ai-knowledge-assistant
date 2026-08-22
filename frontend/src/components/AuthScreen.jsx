@@ -2,86 +2,101 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./AuthScreen.css";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+
+function validate(mode, { email, password, confirmPassword }) {
+  const fieldErrors = {};
+
+  if (!EMAIL_PATTERN.test(email.trim())) {
+    fieldErrors.email = "Enter a valid email address.";
+  }
+
+  if (mode === "signup" && password.length < MIN_PASSWORD_LENGTH) {
+    fieldErrors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  } else if (!password) {
+    fieldErrors.password = "Enter your password.";
+  }
+
+  if (mode === "signup" && password !== confirmPassword) {
+    fieldErrors.confirmPassword = "Passwords don't match.";
+  }
+
+  return fieldErrors;
+}
+
 function AuthScreen() {
   const { login, signup } = useAuth();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError("");
+    setFormError("");
+
+    const errors = validate(mode, { email, password, confirmPassword });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (mode === "login") {
-        await login(email, password);
+        await login(email.trim(), password);
       } else {
-        await signup(email, password);
+        await signup(email.trim(), password);
       }
     } catch (err) {
-      setError(err.message || "Something went wrong. Please try again.");
+      // Server-side failures (wrong password, duplicate email on signup,
+      // etc.) — client-side validation above already ruled out malformed
+      // input, so anything reaching here is a real response from the API.
+      setFormError(err.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  function switchMode(nextMode) {
-    if (nextMode === mode) return;
-    setMode(nextMode);
-    setError("");
+  function switchMode() {
+    setMode((current) => (current === "login" ? "signup" : "login"));
+    setFormError("");
+    setFieldErrors({});
     setPassword("");
+    setConfirmPassword("");
   }
+
+  const isLogin = mode === "login";
 
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <h1 className="auth-title">Personal AI Knowledge Assistant</h1>
-
-        <div className="auth-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "login"}
-            className={`auth-tab${mode === "login" ? " auth-tab-active" : ""}`}
-            onClick={() => switchMode("login")}
-          >
-            Log In
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "signup"}
-            className={`auth-tab${mode === "signup" ? " auth-tab-active" : ""}`}
-            onClick={() => switchMode("signup")}
-          >
-            Sign Up
-          </button>
-        </div>
-
+        <p className="auth-heading">{isLogin ? "Welcome back" : "Create your account"}</p>
         <p className="auth-subtitle">
-          {mode === "login"
+          {isLogin
             ? "Log in to see your documents and conversations."
-            : "Create an account — your documents and conversations will be private to you."}
+            : "Your documents and conversations will be private to this account."}
         </p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <label className="auth-field">
             <span>Email</span>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              required
+              className={fieldErrors.email ? "auth-input-invalid" : ""}
               autoComplete="email"
               autoFocus
             />
-            {mode === "signup" && (
-              <p className="field-hint">
-                No confirmation email is sent — double-check this is typed correctly, since it's how you'll log
-                back in.
-              </p>
+            {fieldErrors.email && <p className="auth-field-error">{fieldErrors.email}</p>}
+            {!isLogin && !fieldErrors.email && (
+              <p className="field-hint">No confirmation email is sent — double-check this is correct.</p>
             )}
           </label>
 
@@ -91,19 +106,39 @@ function AuthScreen() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={mode === "signup" ? 8 : undefined}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              className={fieldErrors.password ? "auth-input-invalid" : ""}
+              autoComplete={isLogin ? "current-password" : "new-password"}
             />
-            {mode === "signup" && <p className="field-hint">At least 8 characters.</p>}
+            {fieldErrors.password && <p className="auth-field-error">{fieldErrors.password}</p>}
+            {!isLogin && !fieldErrors.password && (
+              <p className="field-hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
+            )}
           </label>
 
-          {error && <p className="status status-error">{error}</p>}
+          {!isLogin && (
+            <label className="auth-field">
+              <span>Confirm Password</span>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className={fieldErrors.confirmPassword ? "auth-input-invalid" : ""}
+                autoComplete="new-password"
+              />
+              {fieldErrors.confirmPassword && <p className="auth-field-error">{fieldErrors.confirmPassword}</p>}
+            </label>
+          )}
+
+          {formError && <p className="status status-error">{formError}</p>}
 
           <button type="submit" className="auth-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
+            {isSubmitting ? "Please wait…" : isLogin ? "Log In" : "Create Account"}
           </button>
         </form>
+
+        <button type="button" className="auth-switch" onClick={switchMode}>
+          {isLogin ? "Don't have an account? Sign up" : "Already have an account? Log in"}
+        </button>
       </div>
     </div>
   );
