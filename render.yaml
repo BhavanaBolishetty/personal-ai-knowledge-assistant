@@ -50,6 +50,12 @@ services:
       # EMBEDDING_PROVIDER=gemini never imports them at runtime.
       - key: INSTALL_LOCAL_EMBEDDINGS
         value: "false"
+      # Signs/verifies login tokens (app/core/security.py). generateValue
+      # (not sync: false) — Render generates a random 256-bit value itself
+      # on first creation and keeps it stable across redeploys, so there's
+      # no manual secret to generate/paste for this one.
+      - key: JWT_SECRET_KEY
+        generateValue: true
 
   - type: web
     name: paika-frontend
