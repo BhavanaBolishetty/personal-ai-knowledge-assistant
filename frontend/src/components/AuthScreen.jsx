@@ -4,6 +4,21 @@ import "./AuthScreen.css";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const PASSWORD_HINT = `At least ${MIN_PASSWORD_LENGTH} characters, with an uppercase letter, a lowercase letter, a number, and a symbol.`;
+
+// Mirrors the backend's own rule (SignupRequest.validate_password_strength
+// in app/api/schemas.py) — this is just the fast client-side check; the
+// backend enforces the same rule regardless, since anything could call the
+// API directly without going through this form at all.
+function getPasswordIssues(password) {
+  const issues = [];
+  if (password.length < MIN_PASSWORD_LENGTH) issues.push(`at least ${MIN_PASSWORD_LENGTH} characters`);
+  if (!/[A-Z]/.test(password)) issues.push("an uppercase letter");
+  if (!/[a-z]/.test(password)) issues.push("a lowercase letter");
+  if (!/\d/.test(password)) issues.push("a number");
+  if (!/[^A-Za-z0-9]/.test(password)) issues.push("a symbol");
+  return issues;
+}
 
 function validate(mode, { email, password, confirmPassword }) {
   const fieldErrors = {};
@@ -12,8 +27,11 @@ function validate(mode, { email, password, confirmPassword }) {
     fieldErrors.email = "Enter a valid email address.";
   }
 
-  if (mode === "signup" && password.length < MIN_PASSWORD_LENGTH) {
-    fieldErrors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  if (mode === "signup") {
+    const issues = getPasswordIssues(password);
+    if (issues.length > 0) {
+      fieldErrors.password = `Password needs ${issues.join(", ")}.`;
+    }
   } else if (!password) {
     fieldErrors.password = "Enter your password.";
   }
@@ -95,9 +113,6 @@ function AuthScreen() {
               autoFocus
             />
             {fieldErrors.email && <p className="auth-field-error">{fieldErrors.email}</p>}
-            {!isLogin && !fieldErrors.email && (
-              <p className="field-hint">No confirmation email is sent — double-check this is correct.</p>
-            )}
           </label>
 
           <label className="auth-field">
@@ -110,9 +125,7 @@ function AuthScreen() {
               autoComplete={isLogin ? "current-password" : "new-password"}
             />
             {fieldErrors.password && <p className="auth-field-error">{fieldErrors.password}</p>}
-            {!isLogin && !fieldErrors.password && (
-              <p className="field-hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
-            )}
+            {!isLogin && !fieldErrors.password && <p className="field-hint">{PASSWORD_HINT}</p>}
           </label>
 
           {!isLogin && (

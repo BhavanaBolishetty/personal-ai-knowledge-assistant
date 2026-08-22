@@ -1,7 +1,8 @@
+import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.config import settings
 from app.db.models import DocumentStatus, SourceType
@@ -9,12 +10,23 @@ from app.db.models import DocumentStatus, SourceType
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    # Length-only requirement, deliberately not complex composition rules
-    # (uppercase/digit/symbol requirements) — those rules are well known to
-    # push users toward predictable patterns without meaningfully improving
-    # real-world security, and this project isn't the place for a password
-    # policy debate.
     password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        # Enforced here, not just in the frontend (AuthScreen.jsx) — client-side
+        # validation is a UX nicety, not a real guarantee, since any request
+        # can hit this endpoint directly without going through the UI at all.
+        if not re.search(r"[A-Z]", value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one number.")
+        if not re.search(r"[^A-Za-z0-9]", value):
+            raise ValueError("Password must contain at least one symbol.")
+        return value
 
 
 class LoginRequest(BaseModel):

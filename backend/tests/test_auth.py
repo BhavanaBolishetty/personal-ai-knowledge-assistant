@@ -21,7 +21,7 @@ def real_auth():
         app.dependency_overrides[get_current_user] = original
 
 
-def _signup(email, password="a-real-password"):
+def _signup(email, password="A-real-Password1!"):
     return client.post("/auth/signup", json={"email": email, "password": password})
 
 
@@ -48,25 +48,39 @@ def test_signup_rejects_duplicate_email(real_auth):
 
 
 def test_signup_rejects_short_password(real_auth):
-    response = client.post("/auth/signup", json={"email": "short@example.com", "password": "short"})
+    response = client.post("/auth/signup", json={"email": "short@example.com", "password": "Sh0rt!"})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "label,password",
+    [
+        ("no-uppercase", "alllowercase1!"),
+        ("no-lowercase", "ALLUPPERCASE1!"),
+        ("no-digit", "NoDigitsHere!"),
+        ("no-symbol", "NoSymbolsHere1"),
+    ],
+)
+def test_signup_rejects_weak_passwords(real_auth, label, password):
+    response = client.post("/auth/signup", json={"email": f"weak-{label}@example.com", "password": password})
     assert response.status_code == 422
 
 
 def test_signup_rejects_invalid_email(real_auth):
-    response = client.post("/auth/signup", json={"email": "not-an-email", "password": "a-real-password"})
+    response = client.post("/auth/signup", json={"email": "not-an-email", "password": "A-real-Password1!"})
     assert response.status_code == 422
 
 
 def test_login_with_correct_credentials_succeeds(real_auth):
-    _signup("login-ok@example.com", "correct-password")
-    response = client.post("/auth/login", json={"email": "login-ok@example.com", "password": "correct-password"})
+    _signup("login-ok@example.com", "Correct-Password1!")
+    response = client.post("/auth/login", json={"email": "login-ok@example.com", "password": "Correct-Password1!"})
     assert response.status_code == 200
     assert response.json()["token"]
 
 
 def test_login_with_wrong_password_fails(real_auth):
-    _signup("login-bad@example.com", "correct-password")
-    response = client.post("/auth/login", json={"email": "login-bad@example.com", "password": "wrong-password"})
+    _signup("login-bad@example.com", "Correct-Password1!")
+    response = client.post("/auth/login", json={"email": "login-bad@example.com", "password": "Wrong-Password1!"})
     assert response.status_code == 401
 
 
