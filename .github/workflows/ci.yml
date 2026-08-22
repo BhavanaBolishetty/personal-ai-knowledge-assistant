@@ -1,0 +1,91 @@
+# Runs the backend test suite and frontend lint/build on every push and PR
+# to main, so a broken commit is caught here instead of on Render (which
+# would otherwise be the first thing to run this code after your machine).
+#
+# No GEMINI_API_KEY is configured here on purpose: EMBEDDING_PROVIDER
+# defaults to "local" (sentence-transformers, no API key/cost), and
+# tests/test_ask_integration.py already self-skips when GEMINI_API_KEY is
+# unset (see its skipif) — this workflow runs everything except that one
+# live-API test, at zero API cost.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: paika_user
+          POSTGRES_PASSWORD: paika_password
+          POSTGRES_DB: paika_knowledge_base
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paika_user -d paika_knowledge_base"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_USER: paika_user
+      POSTGRES_PASSWORD: paika_password
+      POSTGRES_DB: paika_knowledge_base
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      # Signs tokens for the throwaway test database only — not a real
+      # secret, never used against production data.
+      JWT_SECRET_KEY: ci-only-signing-key-not-used-in-production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements-core.txt
+            backend/requirements-local-embeddings.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-local-embeddings.txt
+          pip install -r requirements-core.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest -q
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build

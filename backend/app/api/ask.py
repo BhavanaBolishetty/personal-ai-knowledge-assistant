@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.schemas import AskRequest, AskResponse
+from app.core.rate_limit import limit_ask
 from app.db.models import User
 from app.db.session import get_db
 from app.embeddings import EmbeddingError
@@ -46,7 +47,7 @@ def run_ask(call: Callable[[], T]) -> T:
         ) from exc
 
 
-@router.post("/ask", response_model=AskResponse)
+@router.post("/ask", response_model=AskResponse, dependencies=[Depends(limit_ask)])
 def ask_question(
     request: AskRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):

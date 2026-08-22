@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.schemas import LoginRequest, SignupRequest, TokenResponse, UserResponse
+from app.core.rate_limit import limit_login, limit_signup
 from app.core.security import AuthError, create_access_token, hash_password, verify_password
 from app.db import crud
 from app.db.models import User
@@ -11,7 +12,7 @@ from app.db.session import get_db
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/signup", response_model=TokenResponse, status_code=201)
+@router.post("/signup", response_model=TokenResponse, status_code=201, dependencies=[Depends(limit_signup)])
 def signup(request: SignupRequest, db: Session = Depends(get_db)):
     if crud.get_user_by_email(db, request.email) is not None:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -20,7 +21,7 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
     return _issue_token(user)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(limit_login)])
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     user = crud.get_user_by_email(db, request.email)
     # Same generic message whether the email doesn't exist or the password

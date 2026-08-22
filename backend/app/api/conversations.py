@@ -11,6 +11,7 @@ from app.api.schemas import (
     ConversationDetailResponse,
     ConversationSummary,
 )
+from app.core.rate_limit import limit_ask
 from app.db import crud
 from app.db.models import User
 from app.db.session import get_db
@@ -58,7 +59,7 @@ def delete_conversation(
     crud.delete_conversation(db, conversation)
 
 
-@router.post("/{conversation_id}/ask", response_model=AskResponse)
+@router.post("/{conversation_id}/ask", response_model=AskResponse, dependencies=[Depends(limit_ask)])
 def ask_in_conversation(
     conversation_id: uuid.UUID,
     request: AskRequest,

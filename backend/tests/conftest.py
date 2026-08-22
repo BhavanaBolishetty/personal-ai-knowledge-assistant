@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.rate_limit import limit_ask, limit_login, limit_signup
 from app.db import crud
 from app.db.session import engine, get_db
 from app.main import app
@@ -95,3 +96,21 @@ def _default_auth_override(_test_database):
     app.dependency_overrides[get_current_user] = _default_test_user
     yield
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _default_rate_limit_override(_test_database):
+    # The real limiters are IP/user-keyed, in-process counters — without
+    # this override, the hundreds of /auth/* and /ask requests the full
+    # suite makes (many tests sign up several users each) would trip the
+    # same limits real abuse is meant to trip, failing tests that have
+    # nothing to do with rate limiting. tests/test_rate_limit.py pops these
+    # (same pattern as test_auth.py's real_auth fixture) to test the real
+    # limiter behavior directly.
+    app.dependency_overrides[limit_login] = lambda: None
+    app.dependency_overrides[limit_signup] = lambda: None
+    app.dependency_overrides[limit_ask] = lambda: None
+    yield
+    app.dependency_overrides.pop(limit_login, None)
+    app.dependency_overrides.pop(limit_signup, None)
+    app.dependency_overrides.pop(limit_ask, None)

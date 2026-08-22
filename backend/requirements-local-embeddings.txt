@@ -3,4 +3,4 @@
 # (see Dockerfile's INSTALL_LOCAL_EMBEDDINGS build arg) when
 # EMBEDDING_PROVIDER=gemini means this is never imported at runtime — see
 # app/embeddings/service.py and the memory investigation notes in README.
-sentence-transformers>=3.0
+sentence-transformers==5.7.0
