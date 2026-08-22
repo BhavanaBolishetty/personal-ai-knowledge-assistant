@@ -60,24 +60,6 @@
   color: var(--text-h);
 }
 
-.app-header-user {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.app-header-email {
-  font-size: 0.8rem;
-  color: var(--text);
-  opacity: 0.75;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: default;
-}
-
 .app-loading {
   height: 100svh;
   width: 100%;
