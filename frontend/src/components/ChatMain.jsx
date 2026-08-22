@@ -87,10 +87,21 @@ function ChatMain({ conversationId, onConversationCreated, onConversationChanged
   const [voiceError, setVoiceError] = useState("");
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  // Set right after we create a brand-new conversation ourselves (see
+  // handleSubmit) so the conversationId-change effect below doesn't
+  // immediately re-fetch and overwrite the optimistic user message we
+  // already show locally — the server hasn't saved it yet at that instant
+  // (the answer call is still in flight), so that fetch would return an
+  // empty conversation and wipe the message off the screen.
+  const skipNextFetchForIdRef = useRef(null);
 
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
+      return;
+    }
+    if (skipNextFetchForIdRef.current === conversationId) {
+      skipNextFetchForIdRef.current = null;
       return;
     }
     getConversation(conversationId)
@@ -124,6 +135,7 @@ function ChatMain({ conversationId, onConversationCreated, onConversationChanged
       if (!activeId) {
         const conversation = await createConversation();
         activeId = conversation.id;
+        skipNextFetchForIdRef.current = activeId;
         onConversationCreated(conversation);
       }
 
