@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.api.schemas import AskRequest, AskResponse
+from app.db.models import User
 from app.db.session import get_db
 from app.embeddings import EmbeddingError
 from app.llm import LLMError, LLMRateLimitError, LLMTimeoutError
@@ -45,7 +47,9 @@ def run_ask(call: Callable[[], T]) -> T:
 
 
 @router.post("/ask", response_model=AskResponse)
-def ask_question(request: AskRequest, db: Session = Depends(get_db)):
+def ask_question(
+    request: AskRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     """Grounded question answering: retrieves relevant chunks and asks
     Gemini to answer using only that retrieved context, returning
     structured source citations alongside the answer.
@@ -53,5 +57,5 @@ def ask_question(request: AskRequest, db: Session = Depends(get_db)):
     Stateless — no conversation memory. See POST /conversations/{id}/ask
     for the conversation-aware version.
     """
-    result = run_ask(lambda: answer_question(db, request.query, request.top_k))
+    result = run_ask(lambda: answer_question(db, request.query, request.top_k, current_user.id))
     return AskResponse(**result)

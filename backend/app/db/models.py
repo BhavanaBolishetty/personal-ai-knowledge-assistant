@@ -28,6 +28,23 @@ class DocumentStatus(str, enum.Enum):
     failed = "failed"
 
 
+class User(Base):
+    """An account. Every document and conversation is scoped to exactly one
+    user (see Document.user_id / Conversation.user_id below) — without this,
+    the app has no concept of "private" data at all, which is exactly the
+    gap that motivated adding auth: the live demo URL let anyone see every
+    uploaded document and every conversation, not just their own."""
+
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, nullable=False, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
 class Document(Base):
     """Metadata for one uploaded knowledge source. Chunk/embedding storage
     is added in a later milestone once retrieval is implemented."""
@@ -35,6 +52,12 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Nullable rather than a hard NOT NULL: documents uploaded before auth
+    # existed have no owner and stay that way until explicitly claimed (see
+    # backend/scripts/assign_orphaned_data.py) — every query that lists/gets/
+    # deletes documents filters by user_id, so a NULL owner is simply
+    # invisible/inaccessible rather than a data-integrity problem to fix.
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     original_filename = Column(String, nullable=False)
     source_type = Column(Enum(SourceType, name="source_type"), nullable=False)
     status = Column(
@@ -117,13 +140,13 @@ class MessageRole(str, enum.Enum):
 
 
 class Conversation(Base):
-    """A persisted chat thread. Kept deliberately minimal — no per-user
-    ownership yet (no auth in this project), just an independent thread of
-    messages with a display title."""
+    """A persisted chat thread, scoped to the user who created it (see
+    User.__doc__ above for why user_id is nullable)."""
 
     __tablename__ = "conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     title = Column(String, nullable=False, default="New conversation")
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False

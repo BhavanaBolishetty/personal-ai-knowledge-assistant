@@ -107,7 +107,7 @@ def test_followup_question_uses_condensed_query_for_retrieval(monkeypatch):
 
     captured_queries = []
 
-    def _fake_search(db, query, top_k):
+    def _fake_search(db, query, top_k, user_id):
         captured_queries.append(query)
         return []
 
@@ -212,7 +212,7 @@ def test_casual_message_in_conversation_skips_retrieval_gets_no_sources(monkeypa
 
     search_calls = []
     generate_calls = []
-    monkeypatch.setattr(service_module, "search", lambda db, query, top_k: search_calls.append(1) or [])
+    monkeypatch.setattr(service_module, "search", lambda db, query, top_k, user_id: search_calls.append(1) or [])
     monkeypatch.setattr(
         service_module, "generate_answer", lambda **kwargs: generate_calls.append(1) or "unused"
     )
@@ -236,7 +236,7 @@ def test_casual_message_in_conversation_skips_retrieval_gets_no_sources(monkeypa
 def test_casual_first_message_does_not_set_conversation_title(monkeypatch):
     import app.synthesis.service as service_module
 
-    monkeypatch.setattr(service_module, "search", lambda db, query, top_k: [])
+    monkeypatch.setattr(service_module, "search", lambda db, query, top_k, user_id: [])
 
     conversation = client.post("/conversations").json()
     client.post(f"/conversations/{conversation['id']}/ask", json={"query": "hi"})
@@ -250,7 +250,7 @@ def test_no_gemini_call_when_nothing_retrieved(monkeypatch):
 
     calls = []
     monkeypatch.setattr(service_module, "generate_answer", lambda **kwargs: calls.append(1) or "unused")
-    monkeypatch.setattr(service_module, "search", lambda db, query, top_k: [])
+    monkeypatch.setattr(service_module, "search", lambda db, query, top_k, user_id: [])
 
     conversation = client.post("/conversations").json()
     response = client.post(

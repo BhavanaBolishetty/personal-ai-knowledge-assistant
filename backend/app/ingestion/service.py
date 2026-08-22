@@ -31,7 +31,7 @@ def delete_document(db: Session, document: Document) -> None:
     crud.delete_document(db, document)
 
 
-def ingest_document(db: Session, original_filename: str, content: bytes) -> Document:
+def ingest_document(db: Session, original_filename: str, content: bytes, user_id: uuid.UUID) -> Document:
     extension, source_type = validate_upload(original_filename, content)
 
     document_id = uuid.uuid4()
@@ -40,6 +40,7 @@ def ingest_document(db: Session, original_filename: str, content: bytes) -> Docu
     document = crud.create_document(
         db,
         id=document_id,
+        user_id=user_id,
         original_filename=original_filename,
         source_type=source_type,
         file_size_bytes=len(content),
@@ -53,7 +54,7 @@ def ingest_document(db: Session, original_filename: str, content: bytes) -> Docu
     return _process_document(db, document, source_type, content, extract_kwargs)
 
 
-def ingest_url(db: Session, url: str) -> Document:
+def ingest_url(db: Session, url: str, user_id: uuid.UUID) -> Document:
     content, _content_type = fetch_url(url)  # raises InvalidURLError/URLFetchError
 
     html = content.decode("utf-8", errors="replace")
@@ -63,6 +64,7 @@ def ingest_url(db: Session, url: str) -> Document:
     document = crud.create_document(
         db,
         id=uuid.uuid4(),
+        user_id=user_id,
         original_filename=title or url,
         source_type=SourceType.url,
         file_size_bytes=len(content),

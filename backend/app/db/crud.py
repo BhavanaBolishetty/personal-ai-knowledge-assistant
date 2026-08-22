@@ -3,13 +3,30 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Conversation, Document, DocumentStatus, Message, MessageRole, SourceType
+from app.db.models import Chunk, Conversation, Document, DocumentStatus, Message, MessageRole, SourceType, User
+
+
+def create_user(db: Session, *, email: str, hashed_password: str) -> User:
+    user = User(email=email, hashed_password=hashed_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_user_by_email(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.email == email).first()
+
+
+def get_user(db: Session, user_id: uuid.UUID) -> User | None:
+    return db.get(User, user_id)
 
 
 def create_document(
     db: Session,
     *,
     id: uuid.UUID,
+    user_id: uuid.UUID,
     original_filename: str,
     source_type: SourceType,
     file_size_bytes: int,
@@ -18,6 +35,7 @@ def create_document(
 ) -> Document:
     document = Document(
         id=id,
+        user_id=user_id,
         original_filename=original_filename,
         source_type=source_type,
         status=DocumentStatus.processing,
@@ -49,12 +67,20 @@ def mark_document_failed(db: Session, document: Document, *, error_message: str)
     return document
 
 
-def get_document(db: Session, document_id: uuid.UUID) -> Document | None:
-    return db.get(Document, document_id)
+def get_document(db: Session, document_id: uuid.UUID, user_id: uuid.UUID) -> Document | None:
+    # Scoped by owner in the query itself (not checked after fetching) so a
+    # document belonging to another user returns None — indistinguishable
+    # from "doesn't exist" to every caller, which already 404s on None.
+    return db.query(Document).filter(Document.id == document_id, Document.user_id == user_id).first()
 
 
-def list_documents(db: Session) -> list[Document]:
-    return db.query(Document).order_by(Document.uploaded_at.desc()).all()
+def list_documents(db: Session, user_id: uuid.UUID) -> list[Document]:
+    return (
+        db.query(Document)
+        .filter(Document.user_id == user_id)
+        .order_by(Document.uploaded_at.desc())
+        .all()
+    )
 
 
 def delete_document(db: Session, document: Document) -> None:
@@ -117,20 +143,33 @@ def store_chunk_embeddings(
     db.commit()
 
 
-def create_conversation(db: Session, *, id: uuid.UUID, title: str = "New conversation") -> Conversation:
-    conversation = Conversation(id=id, title=title)
+def create_conversation(
+    db: Session, *, id: uuid.UUID, user_id: uuid.UUID, title: str = "New conversation"
+) -> Conversation:
+    conversation = Conversation(id=id, user_id=user_id, title=title)
     db.add(conversation)
     db.commit()
     db.refresh(conversation)
     return conversation
 
 
-def list_conversations(db: Session) -> list[Conversation]:
-    return db.query(Conversation).order_by(Conversation.updated_at.desc()).all()
+def list_conversations(db: Session, user_id: uuid.UUID) -> list[Conversation]:
+    return (
+        db.query(Conversation)
+        .filter(Conversation.user_id == user_id)
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
 
 
-def get_conversation(db: Session, conversation_id: uuid.UUID) -> Conversation | None:
-    return db.get(Conversation, conversation_id)
+def get_conversation(db: Session, conversation_id: uuid.UUID, user_id: uuid.UUID) -> Conversation | None:
+    # Scoped by owner in the query itself — see get_document's comment above,
+    # same reasoning.
+    return (
+        db.query(Conversation)
+        .filter(Conversation.id == conversation_id, Conversation.user_id == user_id)
+        .first()
+    )
 
 
 def delete_conversation(db: Session, conversation: Conversation) -> None:

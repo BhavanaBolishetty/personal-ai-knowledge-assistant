@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.api.schemas import (
     AddUrlRequest,
     DocumentChunksResponse,
@@ -12,6 +13,7 @@ from app.api.schemas import (
     DocumentResponse,
 )
 from app.db import crud
+from app.db.models import User
 from app.db.session import get_db
 from app.ingestion import delete_document, ingest_document, ingest_url
 from app.ingestion.errors import (
@@ -48,10 +50,12 @@ _ATTACHMENT_CONTENT_TYPES = {
 
 
 @router.post("", response_model=DocumentResponse, status_code=201)
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_document(
+    file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     content = await file.read()
     try:
-        return ingest_document(db, file.filename or "unnamed", content)
+        return ingest_document(db, file.filename or "unnamed", content, current_user.id)
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=415, detail=str(exc)) from exc
     except EmptyFileError as exc:
@@ -61,9 +65,9 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
 
 @router.post("/url", response_model=DocumentResponse, status_code=201)
-def add_url(request: AddUrlRequest, db: Session = Depends(get_db)):
+def add_url(request: AddUrlRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        return ingest_url(db, request.url)
+        return ingest_url(db, request.url, current_user.id)
     except InvalidURLError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except URLFetchError as exc:
@@ -71,13 +75,15 @@ def add_url(request: AddUrlRequest, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[DocumentResponse])
-def list_documents(db: Session = Depends(get_db)):
-    return crud.list_documents(db)
+def list_documents(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return crud.list_documents(db, current_user.id)
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse)
-def get_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
-    document = crud.get_document(db, document_id)
+def get_document(
+    document_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    document = crud.get_document(db, document_id, current_user.id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
 
@@ -90,8 +96,10 @@ def get_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.delete("/{document_id}", status_code=204)
-def remove_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
-    document = crud.get_document(db, document_id)
+def remove_document(
+    document_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    document = crud.get_document(db, document_id, current_user.id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
 
@@ -100,7 +108,9 @@ def remove_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/file")
-def get_document_file(document_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_document_file(
+    document_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     """Serves the original uploaded file directly from disk so a source
     can be opened from its citation (e.g. a PDF at the cited page via a
     #page= fragment). Uses FileResponse rather than reading the file into
@@ -112,7 +122,7 @@ def get_document_file(document_id: uuid.UUID, db: Session = Depends(get_db)):
     source_url for those. Never exposes the internal storage path or
     reveals whether one exists beyond a generic 404 — only document bytes
     keyed by document ID, addressed by original_filename in headers."""
-    document = crud.get_document(db, document_id)
+    document = crud.get_document(db, document_id, current_user.id)
     if document is None or not document.storage_path:
         raise HTTPException(status_code=404, detail="No original file available for this document.")
 
@@ -156,11 +166,16 @@ def get_document_file(document_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/chunks", response_model=DocumentChunksResponse, tags=["debug"])
-def get_document_chunks(document_id: uuid.UUID, limit: int = 50, db: Session = Depends(get_db)):
+def get_document_chunks(
+    document_id: uuid.UUID,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Debugging aid to inspect a document's stored chunks. Not the future
     retrieval API — retrieval will search across documents by relevance,
     not list one document's chunks in order."""
-    document = crud.get_document(db, document_id)
+    document = crud.get_document(db, document_id, current_user.id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
 

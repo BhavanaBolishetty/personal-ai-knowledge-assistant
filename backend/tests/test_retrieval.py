@@ -132,7 +132,7 @@ def test_top_k_is_respected():
 def test_empty_knowledge_base_returns_clean_response(monkeypatch):
     import app.retrieval.service as service_module
 
-    monkeypatch.setattr(service_module, "search_chunks", lambda db, embedding, top_k: [])
+    monkeypatch.setattr(service_module, "search_chunks", lambda db, embedding, top_k, user_id: [])
 
     response = search("anything at all, nothing should match")
     assert response.status_code == 200
@@ -159,7 +159,7 @@ def test_database_failure_returns_clean_error(monkeypatch):
     import app.retrieval.service as service_module
     from sqlalchemy.exc import OperationalError
 
-    def _broken_search_chunks(db, embedding, top_k):
+    def _broken_search_chunks(db, embedding, top_k, user_id):
         raise OperationalError("SELECT 1", {}, Exception("connection refused"))
 
     monkeypatch.setattr(service_module, "search_chunks", _broken_search_chunks)

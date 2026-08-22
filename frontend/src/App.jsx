@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import ChatMain from "./components/ChatMain";
 import Sidebar from "./components/Sidebar";
+import AuthScreen from "./components/AuthScreen";
 import { deleteConversation, listConversations } from "./api/conversations";
+import { useAuth } from "./context/AuthContext";
 import "./App.css";
 
 const ACTIVE_CONVERSATION_KEY = "paika:activeConversationId";
@@ -24,7 +26,42 @@ function HamburgerIcon({ open }) {
   );
 }
 
+function LogoutIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 function App() {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return <div className="app-loading">Loading…</div>;
+  }
+
+  if (!currentUser) {
+    return <AuthScreen />;
+  }
+
+  return <MainApp />;
+}
+
+function MainApp() {
+  const { currentUser, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(
@@ -102,6 +139,18 @@ function App() {
           <HamburgerIcon open={sidebarOpen} />
         </button>
         <h1>Personal AI Knowledge Assistant</h1>
+        <div className="app-header-user">
+          <span className="app-header-email">{currentUser.email}</span>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={logout}
+            aria-label="Log out"
+            title="Log out"
+          >
+            <LogoutIcon />
+          </button>
+        </div>
       </header>
 
       <Sidebar

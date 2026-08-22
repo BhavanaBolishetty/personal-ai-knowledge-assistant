@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.ask import run_ask
+from app.api.deps import get_current_user
 from app.api.schemas import (
     AskRequest,
     AskResponse,
@@ -11,32 +12,35 @@ from app.api.schemas import (
     ConversationSummary,
 )
 from app.db import crud
+from app.db.models import User
 from app.db.session import get_db
 from app.synthesis import answer_conversation_question
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
-def _get_conversation_or_404(db: Session, conversation_id: uuid.UUID):
-    conversation = crud.get_conversation(db, conversation_id)
+def _get_conversation_or_404(db: Session, conversation_id: uuid.UUID, user_id: uuid.UUID):
+    conversation = crud.get_conversation(db, conversation_id, user_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     return conversation
 
 
 @router.post("", response_model=ConversationSummary, status_code=201)
-def create_conversation(db: Session = Depends(get_db)):
-    return crud.create_conversation(db, id=uuid.uuid4())
+def create_conversation(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return crud.create_conversation(db, id=uuid.uuid4(), user_id=current_user.id)
 
 
 @router.get("", response_model=list[ConversationSummary])
-def list_conversations(db: Session = Depends(get_db)):
-    return crud.list_conversations(db)
+def list_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return crud.list_conversations(db, current_user.id)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
-def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)):
-    conversation = _get_conversation_or_404(db, conversation_id)
+def get_conversation(
+    conversation_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    conversation = _get_conversation_or_404(db, conversation_id, current_user.id)
     return ConversationDetailResponse(
         id=conversation.id,
         title=conversation.title,
@@ -47,18 +51,27 @@ def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.delete("/{conversation_id}", status_code=204)
-def delete_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)):
-    conversation = _get_conversation_or_404(db, conversation_id)
+def delete_conversation(
+    conversation_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    conversation = _get_conversation_or_404(db, conversation_id, current_user.id)
     crud.delete_conversation(db, conversation)
 
 
 @router.post("/{conversation_id}/ask", response_model=AskResponse)
-def ask_in_conversation(conversation_id: uuid.UUID, request: AskRequest, db: Session = Depends(get_db)):
+def ask_in_conversation(
+    conversation_id: uuid.UUID,
+    request: AskRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Same grounded pipeline as POST /ask, but history-aware: recent
     turns in this conversation help resolve follow-up questions (e.g.
     "its" -> the thing just discussed) before retrieval runs, and both the
     question and answer are persisted as part of the conversation.
     """
-    _get_conversation_or_404(db, conversation_id)
-    result = run_ask(lambda: answer_conversation_question(db, conversation_id, request.query, request.top_k))
+    _get_conversation_or_404(db, conversation_id, current_user.id)
+    result = run_ask(
+        lambda: answer_conversation_question(db, conversation_id, request.query, request.top_k, current_user.id)
+    )
     return AskResponse(**result)

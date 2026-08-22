@@ -19,7 +19,7 @@ NO_CONTEXT_ANSWER = (
 )
 
 
-def answer_question(db: Session, query: str, top_k: int) -> dict:
+def answer_question(db: Session, query: str, top_k: int, user_id: uuid.UUID) -> dict:
     """Retrieval -> grounded prompt -> Gemini -> answer + structured
     sources. Stateless — no conversation memory. Ends here: this does not
     do multi-source synthesis beyond handing Gemini several labeled
@@ -29,7 +29,7 @@ def answer_question(db: Session, query: str, top_k: int) -> dict:
     if casual_category:
         return _casual_result(casual_category)
 
-    results = search(db, query, top_k)  # validates the query; may raise retrieval errors
+    results = search(db, query, top_k, user_id)  # validates the query; may raise retrieval errors
     context, sources = build_context(results, max_context_chars=settings.max_context_chars)
 
     if not sources:
@@ -43,12 +43,16 @@ def answer_question(db: Session, query: str, top_k: int) -> dict:
     return _result(answer_text, cited_sources, results, settings.gemini_model)
 
 
-def answer_conversation_question(db: Session, conversation_id: uuid.UUID, query: str, top_k: int) -> dict:
+def answer_conversation_question(
+    db: Session, conversation_id: uuid.UUID, query: str, top_k: int, user_id: uuid.UUID
+) -> dict:
     """Same as answer_question, but history-aware: recent conversation
     turns are used to resolve references ("its", "that") in the retrieval
     query, and shown to Gemini as context for tone — never as a source of
     facts (see prompt.py). The user's question and Gemini's answer are
-    both persisted as part of the conversation.
+    both persisted as part of the conversation. The caller (app/api/
+    conversations.py) has already verified conversation_id belongs to
+    user_id before calling this.
     """
     # Casual small talk ("thanks", "hi", "nothing, thank you") skips
     # retrieval and Gemini entirely — a knowledge-base disclaimer or a
@@ -63,7 +67,7 @@ def answer_conversation_question(db: Session, conversation_id: uuid.UUID, query:
         crud.create_message(
             db, conversation_id, role=MessageRole.assistant, content=result["answer"], sources=result["sources"]
         )
-        conversation = crud.get_conversation(db, conversation_id)
+        conversation = crud.get_conversation(db, conversation_id, user_id)
         crud.touch_conversation(db, conversation)
         return result
 
@@ -77,7 +81,7 @@ def answer_conversation_question(db: Session, conversation_id: uuid.UUID, query:
     # history to resolve against; a first question is already standalone.
     search_query = condense_query(query, history) if history else query
 
-    results = search(db, search_query, top_k)
+    results = search(db, search_query, top_k, user_id)
     context, sources = build_context(results, max_context_chars=settings.max_context_chars)
 
     if not sources:
@@ -100,7 +104,7 @@ def answer_conversation_question(db: Session, conversation_id: uuid.UUID, query:
         db, conversation_id, role=MessageRole.assistant, content=result["answer"], sources=result["sources"]
     )
 
-    conversation = crud.get_conversation(db, conversation_id)
+    conversation = crud.get_conversation(db, conversation_id, user_id)
     crud.set_conversation_title_if_default(db, conversation, query)
     crud.touch_conversation(db, conversation)
 

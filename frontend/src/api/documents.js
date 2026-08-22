@@ -1,56 +1,37 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE_URL, apiFetch, apiFetchNoContent, getToken } from "./client";
 
 export async function uploadDocument(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  return apiFetch("/documents", {
     method: "POST",
     body: formData,
   });
-
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body && body.detail ? body.detail : `Upload failed with status ${response.status}`;
-    throw new Error(message);
-  }
-
-  return body;
 }
 
 export async function addUrl(url) {
-  const response = await fetch(`${API_BASE_URL}/documents/url`, {
+  return apiFetch("/documents/url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
-
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body && body.detail ? body.detail : `Could not add URL (status ${response.status})`;
-    throw new Error(message);
-  }
-
-  return body;
 }
 
 export async function fetchDocuments() {
-  const response = await fetch(`${API_BASE_URL}/documents`);
-  if (!response.ok) {
-    throw new Error(`Failed to load documents (status ${response.status})`);
-  }
-  return response.json();
+  return apiFetch("/documents");
 }
 
 export async function deleteDocument(id) {
-  const response = await fetch(`${API_BASE_URL}/documents/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    throw new Error(`Could not delete document (status ${response.status})`);
-  }
+  return apiFetchNoContent(`/documents/${id}`, { method: "DELETE" });
 }
 
 export function getDocumentFileUrl(documentId) {
-  return `${API_BASE_URL}/documents/${documentId}/file`;
+  // Opened directly by the browser (new tab / download), which can't send
+  // an Authorization header — the token travels as a query param instead,
+  // read by the backend as a fallback when no header is present (see
+  // app/api/deps.py). Still requires being logged in; nothing is public.
+  const token = getToken();
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${API_BASE_URL}/documents/${documentId}/file${tokenParam}`;
 }

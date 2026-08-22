@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -7,7 +9,7 @@ from app.retrieval.repository import search_chunks
 from app.retrieval.validation import validate_query
 
 
-def search(db: Session, query: str, top_k: int) -> list[dict]:
+def search(db: Session, query: str, top_k: int, user_id: uuid.UUID) -> list[dict]:
     """Embeds the query with the exact same embedding function used for
     document chunks (app.embeddings.embed_texts — there is only one such
     function in the app, so "same model and configuration" is guaranteed by
@@ -15,11 +17,12 @@ def search(db: Session, query: str, top_k: int) -> list[dict]:
     the top_k nearest chunks that also clear settings.min_relevance_score
     — nearest-K alone doesn't guarantee relevance (see config.py). Callers
     may legitimately get fewer than top_k results, including zero.
-    Retrieval only — no answer is generated here.
+    Retrieval only — no answer is generated here. Scoped to user_id's own
+    documents (see search_chunks) — never searches another user's data.
     """
     query = validate_query(query)
     query_embedding = embed_texts([query], task_type="RETRIEVAL_QUERY")[0]
-    rows = search_chunks(db, query_embedding, top_k)
+    rows = search_chunks(db, query_embedding, top_k, user_id)
 
     results = [
         {

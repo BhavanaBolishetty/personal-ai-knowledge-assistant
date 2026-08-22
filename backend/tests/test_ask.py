@@ -183,7 +183,7 @@ def test_empty_knowledge_base_does_not_call_gemini(monkeypatch):
     monkeypatch.setattr(
         service_module, "generate_answer", lambda **kwargs: calls.append(1) or "should not be used"
     )
-    monkeypatch.setattr(service_module, "search", lambda db, query, top_k: [])
+    monkeypatch.setattr(service_module, "search", lambda db, query, top_k, user_id: [])
 
     response = ask("a question with absolutely no matching knowledge base content")
     assert response.status_code == 200
@@ -285,7 +285,7 @@ def test_casual_message_skips_retrieval_and_gemini(monkeypatch):
 
     search_calls = []
     generate_calls = []
-    monkeypatch.setattr(service_module, "search", lambda db, query, top_k: search_calls.append(1) or [])
+    monkeypatch.setattr(service_module, "search", lambda db, query, top_k, user_id: search_calls.append(1) or [])
     monkeypatch.setattr(
         service_module, "generate_answer", lambda **kwargs: generate_calls.append(1) or "unused"
     )

@@ -1,10 +1,38 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.core.config import settings
 from app.db.models import DocumentStatus, SourceType
+
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    # Length-only requirement, deliberately not complex composition rules
+    # (uppercase/digit/symbol requirements) — those rules are well known to
+    # push users toward predictable patterns without meaningfully improving
+    # real-world security, and this project isn't the place for a password
+    # policy debate.
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: EmailStr
+    created_at: datetime
+
+
+class TokenResponse(BaseModel):
+    token: str
+    user: UserResponse
 
 
 class DocumentResponse(BaseModel):

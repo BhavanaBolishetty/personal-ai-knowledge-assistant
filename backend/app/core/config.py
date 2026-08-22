@@ -214,6 +214,19 @@ class Settings:
     # the conversation is reopened; they just stop influencing new answers.
     conversation_history_limit = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "6"))
 
+    # Auth. Signs/verifies JWTs handed out on login/signup (app/core/security.py).
+    # Empty-string default matches gemini_api_key above — the app should fail
+    # loudly (see security.py) rather than silently sign tokens with an empty
+    # key if this was never configured, not crash at import time.
+    jwt_secret_key = os.getenv("JWT_SECRET_KEY", "")
+    jwt_algorithm = "HS256"
+    # 7 days: long enough that a personal-project user isn't annoyed by
+    # constant re-logins, short enough that a leaked token doesn't stay valid
+    # indefinitely. No refresh-token flow — a flat expiry is a fine tradeoff
+    # here; refresh-token rotation/revocation is real complexity this
+    # project's scale doesn't need.
+    jwt_expire_minutes = int(os.getenv("JWT_EXPIRE_MINUTES", str(7 * 24 * 60)))
+
     @property
     def database_url(self) -> str:
         if self.database_url_override:

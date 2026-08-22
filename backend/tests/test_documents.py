@@ -131,7 +131,10 @@ def test_delete_document_removes_it_its_chunks_and_its_file():
 
     db = SessionLocal()
     try:
-        storage_path = crud.get_document(db, uuid.UUID(document_id)).storage_path
+        from tests.db_utils import DEFAULT_TEST_USER_EMAIL
+
+        owner = crud.get_user_by_email(db, DEFAULT_TEST_USER_EMAIL)
+        storage_path = crud.get_document(db, uuid.UUID(document_id), owner.id).storage_path
     finally:
         db.close()
     assert storage.read_bytes(storage_path)  # file exists pre-delete (would raise otherwise)
@@ -240,7 +243,10 @@ def test_get_document_file_returns_clean_404_when_file_missing_from_disk():
 
     db = SessionLocal()
     try:
-        document = crud.get_document(db, uuid.UUID(document_id))
+        from tests.db_utils import DEFAULT_TEST_USER_EMAIL
+
+        owner = crud.get_user_by_email(db, DEFAULT_TEST_USER_EMAIL)
+        document = crud.get_document(db, uuid.UUID(document_id), owner.id)
         storage.delete(document.storage_path)  # simulate the file going missing independently of the DB row
     finally:
         db.close()

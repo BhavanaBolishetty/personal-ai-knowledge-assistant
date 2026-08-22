@@ -22,12 +22,17 @@ import psycopg2
 import pytest
 from alembic.config import Config
 from alembic import command
+from fastapi import Depends
 from psycopg2 import sql
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.core.config import settings
-from app.db.session import engine
-from tests.db_utils import truncate_all
+from app.db import crud
+from app.db.session import engine, get_db
+from app.main import app
+from tests.db_utils import DEFAULT_TEST_USER_EMAIL, truncate_all
 
 
 def _ensure_test_database_exists() -> None:
@@ -72,3 +77,21 @@ def _test_database():
     # interrupted mid-test and left rows behind.
     truncate_all()
     yield
+
+
+def _default_test_user(db: Session = Depends(get_db)):
+    # A fresh lookup on every call (not a captured object) — bound to
+    # *this* request's db session, and correct even if truncate_all() ran
+    # again since the last call (see tests/db_utils.py). Every test that
+    # doesn't care about auth specifically (the vast majority — uploading a
+    # document, asking a question, etc.) just implicitly runs as this user,
+    # so the ~170 pre-existing tests written before auth existed keep
+    # working unchanged.
+    return crud.get_user_by_email(db, DEFAULT_TEST_USER_EMAIL)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _default_auth_override(_test_database):
+    app.dependency_overrides[get_current_user] = _default_test_user
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
